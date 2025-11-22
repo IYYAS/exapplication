@@ -7,8 +7,9 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-import logging
+from MainApplication.notifications import send_push_notification
 
+import logging
 from .post_models import Post, PostLike, PostComment, PostImage, PostSave, PostShare, PostRating
 from .post_serializers import (
     PostSerializer, 
@@ -511,6 +512,23 @@ class PostRatingView(APIView):
             )['avg'] or 0
             post.save()
             
+            # 🔔 SEND NOTIFICATION FOR UPDATED RATING
+            if post.user.fcm_token and post.user.notifications_enabled:
+                if post.user != request.user:  # Don't notify if rating own post
+                    send_push_notification(
+                        fcm_token=post.user.fcm_token,
+                        title=f"Rating Updated to {rating_value}⭐",
+                        body=f"{request.user.username} changed their rating from {old_rating}⭐ to {rating_value}⭐",
+                        data={
+                            'type': 'rating_update',
+                            'post_id': str(post.post_id),
+                            'old_rating': str(old_rating),
+                            'new_rating': str(rating_value),
+                            'user_id': str(request.user.id),
+                            'username': request.user.username or 'A user'
+                        }
+                    )
+            
             return Response({
                 'success': True,
                 'message': f'Rating updated from {old_rating}⭐ to {rating_value}⭐',
@@ -553,6 +571,22 @@ class PostRatingView(APIView):
         )['avg'] or 0
         post.save()
         
+        # 🔔 SEND NOTIFICATION FOR NEW RATING
+        if post.user.fcm_token and post.user.notifications_enabled:
+            if post.user != request.user:  # Don't notify if rating own post
+                send_push_notification(
+                    fcm_token=post.user.fcm_token,
+                    title=f"New {rating_value}⭐ Rating!",
+                    body=f"{request.user.username} rated your post {rating_value} stars",
+                    data={
+                        'type': 'rating',
+                        'post_id': str(post.post_id),
+                        'rating': str(rating_value),
+                        'user_id': str(request.user.id),
+                        'username': request.user.username or 'A user'
+                    }
+                )
+        
         return Response({
             'success': True,
             'message': f'Post rated {rating_value}⭐ successfully',
@@ -561,7 +595,6 @@ class PostRatingView(APIView):
             'credits_used': required_credits,
             'remaining_credits': vault.total_credits
         }, status=status.HTTP_201_CREATED)
-
 
 # Update PostLikeView to use credits
 class PostLikeView(APIView):
@@ -649,4 +682,44 @@ def saved_posts(request):
         'success': True,
         'count': len(posts),
         'posts': serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+# your_app/views.py
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_device_token(request):
+    """
+    Save user's FCM token and device info
+    Flutter app calls this after login
+    
+    Expected data:
+    {
+        "fcm_token": "long-token-string",
+        "device_type": "android" or "ios",
+        "enable_notifications": true
+    }
+    """
+    fcm_token = request.data.get('fcm_token')
+    device_type = request.data.get('device_type')
+    enable_notifications = request.data.get('enable_notifications', True)
+    
+    if not fcm_token:
+        return Response({
+            'success': False,
+            'error': 'fcm_token is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Save to user model
+    user = request.user
+    user.fcm_token = fcm_token
+    user.device_type = device_type
+    user.notifications_enabled = enable_notifications
+    user.save()
+    
+    return Response({
+        'success': True,
+        'message': 'Device token saved successfully'
     }, status=status.HTTP_200_OK)

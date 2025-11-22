@@ -17,6 +17,7 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+FIREBASE_CREDENTIALS_PATH = os.path.join(BASE_DIR, 'exapplication-6033c-firebase-adminsdk.json')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -193,7 +194,7 @@ LOGGING = {
         },
     },
     'loggers': {
-        'MainApplication.Post.content_moderator': {
+        'MainApplication': {
             'handlers': ['console'],
             'level': 'INFO',  # Change to DEBUG for more details
             'propagate': False,

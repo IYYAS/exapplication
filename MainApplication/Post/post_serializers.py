@@ -4,6 +4,7 @@ from PIL import Image
 import io
 import logging
 from .post_content_moderator import ImageModerationService
+from .video_content_moderator import VideoModerationService  # NEW IMPORT
 
 from .post_models import Post, PostComment, PostImage, PostLike, PostRating, PostSave, PostShare
 
@@ -171,6 +172,44 @@ class PostCreateSerializer(serializers.ModelSerializer):
         
         logger.info(f"✅ All {len(images)} image(s) passed moderation")
         return images
+    def validate_video(self, video):
+        """
+        Validate video with moderation service
+        Extracts frames and checks them for NSFW content
+        """
+        if not video:
+            return video
+        
+        logger.info(f"🎬 Starting video moderation for: {video.name}")
+        
+        # Initialize video moderation service
+        video_service = VideoModerationService()
+        
+        # Check video (extracts frames and analyzes them)
+        result = video_service.check_video(video)
+        
+        if not result['is_safe']:
+            moderation_data = result.get('moderation', {})
+            details = moderation_data.get('details', {}) if moderation_data else {}
+            unsafe_count = details.get('unsafe_frames_count', 0)
+            unsafe_frames = details.get('unsafe_frames', [])
+            
+            # Create detailed error message
+            if unsafe_frames:
+                timestamps = [f"{uf['timestamp']}s" for uf in unsafe_frames[:3]]
+                error_msg = (
+                    f"Video contains inappropriate content. "
+                    f"{unsafe_count} unsafe frame(s) detected at: {', '.join(timestamps)}"
+                    f"{' ...' if len(unsafe_frames) > 3 else ''}"
+                )
+            else:
+                error_msg = result['message']
+            
+            logger.warning(f"❌ Video rejected: {error_msg}")
+            raise serializers.ValidationError(error_msg)
+        
+        logger.info(f"✅ Video passed moderation")
+        return video
     
     def validate(self, data):
         """Validate post data"""

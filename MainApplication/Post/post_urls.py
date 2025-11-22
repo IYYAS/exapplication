@@ -2,6 +2,7 @@
 from django.urls import path
 from . import post_views
 
+
 app_name = 'posts'
 
 urlpatterns = [
@@ -18,7 +19,8 @@ urlpatterns = [
     path('', post_views.PostListCreateView.as_view(), name='post-list-create'),
     path('<int:pk>/', post_views.PostDetailView.as_view(), name='post-detail'),
     
-   
+    path('device-token/', post_views.update_device_token, name='update-device-token'),
+
     
     
     path('<int:pk>/comments/', post_views.PostCommentListCreateView.as_view(), name='post-comments'),
