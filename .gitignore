@@ -1,0 +1,16 @@
+# Ignore Firebase service account keys
+exapplication-6033c-firebase-adminsdk.json
+*firebase-adminsdk*.json
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Database
+db.sqlite3
+
+# Media files (optional)
+media/
+
+# VSCode
+.vscode/
